@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
 
   interface Response {
     message: string;
@@ -21,6 +21,7 @@
   let nickname = $state("");
   let msg = $state("");
   let formDisabled = $state(false);
+  let intervalId: number;
 
   const { VITE_API_URL: API_URL } = import.meta.env;
 
@@ -65,17 +66,26 @@
         },
       });
 
+      msg = "refreshing...";
+
       const statusCode = res.status;
       const responseJson = (await res.json()) as DataResponse[];
 
       if (statusCode >= 200 && statusCode < 300) {
+        const remoteTeam1: string[] = [];
+        const remoteTeam2: string[] = [];
+
         responseJson.forEach((element) => {
           if (element.team === "orange") {
-            team1.push(element.nickname);
+            remoteTeam1.push(element.nickname);
           } else {
-            team2.push(element.nickname);
+            remoteTeam2.push(element.nickname);
           }
         });
+
+        team1 = remoteTeam1;
+        team2 = remoteTeam2;
+
         console.log(responseJson);
       } else {
         error = "Unable to get data";
@@ -84,14 +94,21 @@
     } catch (error) {
       error = "Backend problem";
       console.error("Fetch error:", error);
+    } finally {
+      msg = "";
     }
   };
 
   onMount(() => {
     getData();
+    intervalId = setInterval(getData, 2500);
     if (localStorage.getItem("registered")) {
       formDisabled = true;
     }
+  });
+
+  onDestroy(() => {
+    clearInterval(intervalId);
   });
 
   const checkIsNickTaken = (nick: string) =>
@@ -139,7 +156,7 @@
   <div class="cs-tabs max-w-[600px] w-full p-4 block">
     <div class="panel block p-5">
       <div class="mb-4">
-        Urodzinowa strzelanka Fedosława<br>
+        Urodzinowa strzelanka Fedosława<br />
         14-03-2025 20:00
       </div>
 
@@ -154,13 +171,7 @@
             contenteditable="plaintext-only"
           ></h1>
         {/if}
-        {#if msg}
-          <h1
-            class="text-2xl"
-            bind:textContent={msg}
-            contenteditable="plaintext-only"
-          ></h1>
-        {/if}
+
         <form onsubmit={handleSubmit}>
           <label class="cs-input__label" for="input">Call sign:</label>
           <input
@@ -198,6 +209,12 @@
           <hr class="cs-hr mt-6" />
         </form>
       </section>
+
+      {#if msg}
+        <h1 bind:textContent={msg} contenteditable="plaintext-only"></h1>
+      {:else}
+        <h1>Data loaded!</h1>
+      {/if}
 
       <div class="grid grid-cols-2 mt-4 text-center gap-4">
         <section class="center">
